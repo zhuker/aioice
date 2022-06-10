@@ -127,7 +127,7 @@ def make_connection(options):
     controlling = options.action == "offer"
     connection = aioice.Connection(
         ice_controlling=controlling, components=options.components, stun_server=STUN_SERVER,
-        use_ipv6=False,
+        use_ipv6=options.ipv6,
         allow_interfaces=allow_interfaces
     )
     return connection
@@ -203,6 +203,7 @@ parser.add_argument("action", choices=["offer", "answer"])
 parser.add_argument("--components", type=int, default=1)
 parser.add_argument("--allow-iface", default=None)
 parser.add_argument("--dev", type=str)
+parser.add_argument("--ipv6", action='store_true')
 parser.add_argument("--ip", type=str)
 parser.add_argument("--mtu", type=int)
 parser.add_argument("--signaling-url", default="", help="Signaling url (eg wss://server:443)")
