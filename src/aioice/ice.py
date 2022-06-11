@@ -424,7 +424,7 @@ class Connection:
                 self._check_list.append(pair)
         self.sort_check_list()
 
-    async def gather_candidates(self) -> None:
+    async def gather_candidates(self, timeout=5) -> None:
         """
         Gather local candidates.
 
@@ -438,7 +438,7 @@ class Connection:
                 allow_list=self.allow_interfaces
             )
             coros = [
-                self.get_component_candidates(component=component, addresses=addresses)
+                self.get_component_candidates(component=component, addresses=addresses, timeout=timeout)
                 for component in self._components
             ]
             for candidates in await asyncio.gather(*coros):
