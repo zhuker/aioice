@@ -91,7 +91,7 @@ class SimpleWebsocketSignaling:
         await self.wsconn.send(txt)
 
 
-async def tun_start(tap, connection):
+async def tun_start(tap, connection, remote_ip=None, route_metric=1):
     debug("tun_start")
     tap.open()
 
@@ -109,9 +109,12 @@ async def tun_start(tap, connection):
 
     mtu = tap.mtu
     tap.up()
-    debug("tun_start tap up", mtu, tap.name.decode())
-    subprocess.run(["ip", "address", "add", tap.ip_addr, "dev", tap.name.decode()], check=True)
-    subprocess.run(["ip", "link", "set", "dev", tap.name.decode(), "mtu", str(mtu)], check=True)
+    dev = tap.name.decode()
+    debug("tun_start tap up", mtu, dev)
+    subprocess.run(["ip", "address", "add", tap.ip_addr, "dev", dev], check=True)
+    subprocess.run(["ip", "link", "set", "dev", dev, "mtu", str(mtu)], check=True)
+    if remote_ip is not None:
+        subprocess.run(["ip", "route", "add", remote_ip, "dev", dev, "metric", str(route_metric)], check=True)
     tap.get_mtu()
     while True:
         data, component = await connection.recvfrom()
@@ -167,7 +170,7 @@ async def offer(options):
     await connection.connect()
     debug("connected")
 
-    await tun_start(tap, connection)
+    await tun_start(tap, connection, options.remote_ip, options.route_metric or 1)
 
 
 async def answer(options):
@@ -199,7 +202,7 @@ async def answer(options):
     await connection.connect()
     debug("connected")
 
-    await tun_start(tap, connection)
+    await tun_start(tap, connection, options.remote_ip, options.route_metric or 1)
 
 
 parser = argparse.ArgumentParser(description="ICE tester")
@@ -209,6 +212,8 @@ parser.add_argument("--allow-iface", default=None)
 parser.add_argument("--dev", type=str)
 parser.add_argument("--ipv6", action='store_true')
 parser.add_argument("--ip", type=str)
+parser.add_argument("--route-metric", type=int)
+parser.add_argument("--remote-ip", type=str)
 parser.add_argument("--mtu", type=int)
 parser.add_argument("--signaling-url", default="", help="Signaling url (eg wss://server:443)")
 parser.add_argument("--our-id", default="", help="Signaling id of this host (websocket only)")
