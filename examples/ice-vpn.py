@@ -142,6 +142,8 @@ def make_signaling(options):
 async def offer(options):
     connection = make_connection(options)
     await connection.gather_candidates()
+    for c in connection.local_candidates:
+        debug("local", c)
 
     signaling = make_signaling(options)
     await signaling.connect()
@@ -170,7 +172,9 @@ async def offer(options):
 
 async def answer(options):
     connection = make_connection(options)
-    await connection.gather_candidates()
+    await connection.gather_candidates(timeout=10)
+    for c in connection.local_candidates:
+        debug("local", c)
 
     signaling = make_signaling(options)
 
