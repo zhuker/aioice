@@ -8,6 +8,7 @@ import random
 import secrets
 import socket
 import threading
+from _socket import SO_BINDTODEVICE
 from itertools import count
 from typing import Dict, List, Optional, Set, Text, Tuple, Union, cast
 
@@ -63,11 +64,11 @@ def candidate_pair_priority(
     return (1 << 32) * min(G, D) + 2 * max(G, D) + (G > D and 1 or 0)
 
 def get_host_addresses(use_ipv4: bool, use_ipv6: bool, block_list: Optional[List[str]] = None,
-                       allow_list: Optional[List[str]] = None) -> List[str]:
+                       allow_list: Optional[List[str]] = None) -> Dict[str, str]:
     """
     Get local IP addresses.
     """
-    addresses = []
+    addresses = dict()
     interfaces = netifaces.interfaces()
     if block_list is not None:
         blocked_interfaces = [item for blocked in block_list for item in fnmatch.filter(interfaces, blocked)]
@@ -79,10 +80,10 @@ def get_host_addresses(use_ipv4: bool, use_ipv6: bool, block_list: Optional[List
         ifaddresses = netifaces.ifaddresses(interface)
         for address in ifaddresses.get(socket.AF_INET, []):
             if use_ipv4 and address["addr"] != "127.0.0.1":
-                addresses.append(address["addr"])
+                addresses[address["addr"]] = interface
         for address in ifaddresses.get(socket.AF_INET6, []):
             if use_ipv6 and address["addr"] != "::1" and "%" not in address["addr"]:
-                addresses.append(address["addr"])
+                addresses[address["addr"]] = interface
     return addresses
 
 
@@ -860,14 +861,14 @@ class Connection:
         return None
 
     async def get_component_candidates(
-        self, component: int, addresses: List[str], timeout: int = 5
+        self, component: int, addresses: Dict[str, str], timeout: int = 5
     ) -> List[Candidate]:
         candidates = []
         loop = asyncio.get_event_loop()
 
         # gather host candidates
         host_protocols = []
-        for address in addresses:
+        for address, interface in addresses.items():
             # create transport
             try:
                 transport, protocol = await loop.create_datagram_endpoint(
@@ -875,9 +876,8 @@ class Connection:
                 )
                 sock = transport.get_extra_info("socket")
                 if sock is not None:
-                    sock.setsockopt(
-                        socket.SOL_SOCKET, socket.SO_RCVBUF, turn.UDP_SOCKET_BUFFER_SIZE
-                    )
+                    sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, turn.UDP_SOCKET_BUFFER_SIZE)
+                    sock.setsockopt(socket.SOL_SOCKET, SO_BINDTODEVICE, str(interface + '\0').encode('utf-8'))
             except OSError as exc:
                 self.__log_info("Could not bind to %s - %s", address, exc)
                 continue
